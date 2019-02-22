@@ -1,25 +1,27 @@
-# Kubernetes Identity Manager
+# Orchestra For Kubernetes - SAML2
 
-[![Alt text](http://i.vimeocdn.com/video/671443572_640.jpg)](https://vimeo.com/246464075)
 
-*Short video of logging into Kubernetes and using kubectl using ADFS*
+Orchestra is an automation portal for Kubernetes built on OpenUnison.  Orachestra integrates a user's identity into Kubernetes enabling:
 
-This quick start for OpenUnison is designed to provide an identity management hub for Kubernetes that will:
+1. SSO between the API server and your LDAP infrastructure
+2. SSO with the Kubernetes Dashboard
+3. Self service access to existing Namespaces
+4. Self service creation of new Namespaces
+5. Workflows for automating access approvals without getting system administrators involved
+6. Built in self service reporting
 
-1. Support authentication with Active Directory for both `kubectl` and the dashboard (https://github.com/kubernetes/dashboard)
-2. Automated creation of Namespaces
-2. Self service portal for requesting access to and getting approval for individual namespaces
-3. Self service requests for gaining cluster level roles
-4. Support removing users' access
-5. Reporting
+![Orchestra Portal Screen Shot](imgs/orchestra-portal-screenshot.png)
 
-The quick start is designed to run inside of Kubernetes, leveraging Kubernetes for scalability and secret management and deployment. 
+When a user accesses Kubernetes using Orchestra, they'll access both the self service portal and the dashboard through OpenUnison's reverse proxy (instead of directly via an ingress).  OpenUnison will inject the user's identity into each request, allowing the dashboard to act on their behalf.
 
-![Kubernetes Identity Manager Architecture](imgs/openunison_qs_kubernetes.png)
+Orchestra stores all Kubernetes access information as a groups inside of a relational database, as opposed to a group in an external directory.  OpenUnison will create the appropriate Roles and RoleBindings to allow for the access.
+
+
+![Orchestra Architecture](imgs/openunison_qs_kubernetes.png)
 
 When a user accesses Kubernetes using OpenUnison, they'll access both te self service portal and the dashboard through OpenUnison (instead of directly via an ingress).  OpenUnison will inject the user's identity into each request, allowing the dashboard to act on their behalf.
 
-The OpenUnison deployment stores all Kubernetes access information as a groups inside of a relational database, as opposed to a group in an external directory.  OpenUnison will create the approprioate Roles and RoleBindings to allow for the access.
+The OpenUnison deployment stores all Kubernetes access information as a groups inside of a relational database, as opposed to a group in an external directory.  OpenUnison will create the appropriate Roles and RoleBindings to allow for the access.
 
 # Roles Supported
 
@@ -30,7 +32,7 @@ The OpenUnison deployment stores all Kubernetes access information as a groups i
 ## Namespace
 
 1.  Administrators - All operations inside of a namespace
-2.  Viewers - Can view contents of a namespace, but can not make changes
+2.  Viewers - Can view contents of a namespace (except `Secret`s), but can not make changes
 
 ## Non-Kubernetes
 
@@ -51,7 +53,7 @@ Prior to deploying OpenUnison you will need:
 
 ## Create Environments File
 
-OpenUnison stores environment specific information, such as host names, passwords, etc, in a properties file that will then be loaded by OpenUnison and merged with its configruation.  This file will be stored in Kubernetes as a secret then accessed by OpenUnison on startup to fill in the `#[]` parameters in `unison.xml` and `myvd.conf`.  For instance the parameter `#[OU_HOST]` in `unison.xml` would have an entry in this file.  Below is an example file:
+Orchestra stores environment specific information, such as host names, passwords, etc, in a properties file that will then be loaded by OpenUnison and merged with its configuration.  This file will be stored in Kubernetes as a secret then accessed by OpenUnison on startup to fill in the `#[]` parameters in `unison.xml` and `myvd.conf`.  For instance the parameter `#[OU_HOST]` in `unison.xml` would have an entry in this file.  Below is an example `input.props` file:
 
 ```properties
 OU_HOST=k8sou.tremolo.lan
@@ -108,7 +110,7 @@ SESSION_INACTIVITY_TIMEOUT_SECONDS=900
 | OU_CERT_ST | The `ST` attribute for the forward facing certificate |
 | OU_CERT_C | The `C` attribute for the forward facing certificate |
 | unisonKeystorePassword | The password for OpenUnison's keystore |
-| USE_K8S_CM | Tells the deployment system if you should use k8s' built in certificate manager.  If your distrobution doesn't support this (such as Canonical and Rancher), set this to false |
+| USE_K8S_CM | Tells the deployment system if you should use k8s' built in certificate manager.  If your distribution doesn't support this (such as Canonical and Rancher), set this to false |
 | SESSION_INACTIVITY_TIMEOUT_SECONDS | The number of seconds of inactivity before the session is terminated, also the length of the refresh token's session |
 | MYVD_CONFIG_PATH | The path to the MyVD configuration file, unless being customized, use `WEB-INF/myvd.conf` |
 
@@ -116,16 +118,16 @@ SESSION_INACTIVITY_TIMEOUT_SECONDS=900
 
 Perform these steps from a location with a working `kubectl` configuration:
 
-1. Create a directory to store `input.props`, ie `/path/to/props` and put `input.props` in that directory
-2. Copy the metadata from your SAML2 identity provider to `/path/to/props/saml2-metadata.xml`
-3. Create a directory for certs, ie `/path/to/certs`
+1. Create a directory to store secrets, ie `/path/to/secrets` and put `input.props` (the properties file defined above) in that directory
+2. Create a directory for config maps, ie `/path/to/configmaps`, copy the metadata from your SAML2 identity provider to `/path/to/configmaps/saml2-metadata.xml`
+
 
 ## Deployment
 
 Based on where you put the files from `Prepare Deployment`, run the following:
 
 ```
-curl https://raw.githubusercontent.com/TremoloSecurity/kubernetes-artifact-deployment/master/src/main/bash/deploy_openunison.sh | bash -s /path/to/certs /path/to/props https://raw.githubusercontent.com/OpenUnison/openunison-k8s-saml2/master/src/main/yaml/artifact-deployment.yaml
+curl https://raw.githubusercontent.com/TremoloSecurity/kubernetes-artifact-deployment/master/src/main/bash/deploy_openunison.sh | bash -s /path/to/configmaps /path/to/secrets https://raw.githubusercontent.com/OpenUnison/openunison-k8s-saml2/master/src/main/yaml/artifact-deployment.yaml
 ```
 
 The output will look like:
@@ -163,19 +165,19 @@ c:[Type == "http://schemas.microsoft.com/ws/2008/06/identity/claims/windowsaccou
  => issue(store = "Active Directory", types = ("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier", "uid", "givenName", "sn", "mail"), query = ";sAMAccountName,sAMAccountName,givenName,sn,mail;{0}", param = c.Value);
 ```
 
-Once the metadata is imported and the attributes are added, you are ready to login to OpenUnison.
+Once the metadata is imported and the attributes are added, you are ready to login to Orchestra.
 
 ## Complete SSO Integration with Kubernetes
 
 Run `kubectl describe configmap api-server-config -n openunison` to get the SSO integration artifacts.  The output will give you both the certificate that needs to be trusted and the API server flags that need to be configured on your API servers.
 
-## First Login to the Kubernetes Identity Manager
+## First Login to Orchestra
 
-At this point you should be able to login to OpenUnison using the host specified in  the `OU_HOST` of your properties.  Once you are logged in, logout.  Users are created in the database "just-in-time", meaning that once you login the data representing your user is created inside of the database deployed for OpenUnison.
+At this point you should be able to login to OpenUnison using the host specified in  the `OU_HOST` of your properties.  Once you are logged in, logout.  Users are created in the database "just-in-time", meaning that once you login the data representing your user is created inside of the database deployed for Orchestra.
 
 ## Create First Administrator
 
-The user you logged in as is currently unprivileged.  In order for other users to login and begin requesting access to projects this first user must be enabled as an approver.  Login to the MySQL database deployed for OpenUnison and execute the following SQL:
+The user you logged in as is currently unprivileged.  In order for other users to login and begin requesting access to projects this first user must be enabled as an approver.  Login to the MySQL database deployed for Orchestra and execute the following SQL:
 
 ```sql
 insert into userGroups (userId,groupId) values (2,1);
@@ -187,7 +189,7 @@ This will add the administrator group to your user.  Logout of OpenUnison and lo
 
 Once SSO is enabled in the next step, you'll need a cluster administrator to be able to perform cluster level operations:
 
-1.  Login to OpenUnison
+1.  Login to Orchestra
 2.  Click on "Request Access" in the title bar
 3.  Click on "Kubernetes Administration"
 4.  Click "Add To Cart" next to "Cluster Administrator"
@@ -198,7 +200,7 @@ Once SSO is enabled in the next step, you'll need a cluster administrator to be 
 9. Specify "Initial user" for the "Justification" and click "Approve"
 10. Click on "Confirm Approval"
 
-At this point you will be provisioned to the `k8s-cluster-administrators` group in the database that has a RoleBinding to the `cluster-admin` Role.  Logout of OpenUnison and log back in.  If you click on your email address in the upper left, you'll see that you have the Role `k8s-cluster-administrators`.  
+At this point you will be provisioned to the `k8s-cluster-administrators` group in the database that has a RoleBinding to the `cluster-admin` Role.  Logout of Orchestra and log back in.  If you click on your email address in the upper left, you'll see that you have the Role `k8s-cluster-administrators`.  
 
 # Updating Secrets and Certificates
 
@@ -207,7 +209,7 @@ In order to change the secrets or update certificate store:
 Download the contents of `openunison-secrets` in the `openunison` namespace into an empty directory
 
 ```
-kubectl get  secret openunison-secrets -o json  -n openunison | python /apth/to/openunison-qs-kubernetes/src/main/python/download_secrets.py
+kubectl get  secret openunison-secrets -o json  -n openunison | python /path/to/openunison-k8s-saml2/src/main/python/download_secrets.py
 ```
 
 `download_secrets.py` is a utility script for pulling the files out of secrets and config maps.  Next, make your changes.  You can't apply over an existing secret, so next delete the current secret:
@@ -222,7 +224,7 @@ Finally, create the secret from the directory where you downloaded the secrets:
 kubectl create secret generic openunison-secrets --from-file=. -n openunison
 ```
 
-Redpeloy OpenUnison to pick up the changes.  The easiest way is to update an environment variable in the `openunison` deployment
+Redeploy Orchestra to pick up the changes.  The easiest way is to update an environment variable in the `openunison` deployment
 
 # Whats next?
 Users can now login to create namespaces, request access to cluster admin or request access to other clusters.
