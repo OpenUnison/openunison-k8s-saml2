@@ -92,7 +92,7 @@ data:
     signing\")) {\n        sig_cert = key.getElementsByTagName(\"KeyInfo\").item(0).getElementsByTagName(\"\
     X509Data\").item(0).getElementsByTagName(\"X509Certificate\").item(0).getTextContent();\n\
     \        sig_certs.push(sig_cert);\n    }\n}\n\nif (sig_certs.length == 1) {\n\
-    \    current_cert_choice = com.tremolosecurity.kubernetes.artifacts.util.CertUtils.string2cert(sig_certs[i]);\n\
+    \    current_cert_choice = com.tremolosecurity.kubernetes.artifacts.util.CertUtils.string2cert(sig_certs[0]);\n\
     } else {\n    for (i=0;i<sig_certs.length;i++) {\n        current_cert = com.tremolosecurity.kubernetes.artifacts.util.CertUtils.string2cert(sig_certs[i]);\n\
     \        if (current_cert_choice == null) {\n            current_cert_choice =\
     \ current_cert;\n        } else {\n            if (current_cert_choice.getNotAfter().compareTo(current_cert.getNotAfter())\
@@ -212,22 +212,22 @@ data:
     Runing kubectl create\");\nk8s.kubectlCreate(k8s.processTemplate(deploymentTemplate,inProp));\n\
     print(\"kubectl complete\");\n\n\n\n\n\nxmlMetaData =  '<EntityDescriptor ID=\"\
     _10685acd-7df4-427e-b61e-68e4f6407c24\" entityID=\"https://' + inProp['OU_HOST']\
-    \ + '/auth/SAML2\" xmlns=\"urn:oasis:names:tc:SAML:2.0:metadata\">\\n';\nxmlMetaData\
-    \ += '  <SPSSODescriptor WantAssertionsSigned=\"true\" protocolSupportEnumeration=\"\
+    \ + '/auth/SAML2Auth\" xmlns=\"urn:oasis:names:tc:SAML:2.0:metadata\">\\n';\n\
+    xmlMetaData += '  <SPSSODescriptor WantAssertionsSigned=\"true\" protocolSupportEnumeration=\"\
     urn:oasis:names:tc:SAML:2.0:protocol\">\\n';\nxmlMetaData += '      <KeyDescriptor\
     \ use=\"signing\">\\n';\nxmlMetaData += '        <KeyInfo xmlns=\"http://www.w3.org/2000/09/xmldsig#\"\
     >\\n';\nxmlMetaData += '              <X509Data>\\n';\nxmlMetaData += '      \
-    \            <X509Certificate>\\n' + new org.apache.commons.codec.binary.Base64(64).encodeToString(rp_sig_cert_bytes)\
-    \ + '\\n</X509Certificate>\\n';\nxmlMetaData += '              </X509Data>\\n';\n\
+    \            <X509Certificate>\\n' + new org.apache.commons.codec.binary.Base64(64).encodeToString(rp_sig_cert_bytes.getEncoded())\
+    \ + '</X509Certificate>\\n';\nxmlMetaData += '              </X509Data>\\n';\n\
     xmlMetaData += '          </KeyInfo>\\n';\nxmlMetaData += '      </KeyDescriptor>\\\
     n';\nxmlMetaData += '      <SingleLogoutService Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect\"\
-    \ Location=\"https://' + inProp['OU_HOST'] + '/auth/SAML2\"/>\\n';\nxmlMetaData\
+    \ Location=\"https://' + inProp['OU_HOST'] + '/auth/SAML2Auth\"/>\\n';\nxmlMetaData\
     \ += '      <NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified</NameIDFormat>\\\
     n';\nxmlMetaData += '      <AssertionConsumerService Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST\"\
-    \ Location=\"https://' + inProp['OU_HOST'] + '/auth/SAML2\" index=\"0\" isDefault=\"\
+    \ Location=\"https://' + inProp['OU_HOST'] + '/auth/SAML2Auth\" index=\"0\" isDefault=\"\
     true\"/>\\n';\nxmlMetaData += '      <AssertionConsumerService Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect\"\
-    \ Location=\"https://' + inProp['OU_HOST'] + '/auth/SAML2\" index=\"1\"/>\\n';\n\
-    xmlMetaData += '  </SPSSODescriptor>\\n';\nxmlMetaData += '</EntityDescriptor>';\n\
+    \ Location=\"https://' + inProp['OU_HOST'] + '/auth/SAML2Auth\" index=\"1\"/>\\\
+    n';\nxmlMetaData += '  </SPSSODescriptor>\\n';\nxmlMetaData += '</EntityDescriptor>';\n\
     \n\n\n\n\n\ncfgMap = {\n    \"apiVersion\":\"v1\",\n    \"kind\":\"ConfigMap\"\
     ,\n    \"metadata\":{\n        \"name\":\"api-server-config\",\n        \"namespace\"\
     :\"openunison\"\n    },\n    \"data\":{\n        \"oidc-api-server-flags\":oidcFlags,\n\
@@ -305,16 +305,15 @@ data:
     \ -Djava.awt.headless=true -Djava.security.egd=file:/dev/./urandom\n         \
     \   -DunisonEnvironmentFile=/etc/openunison/ou.env\n        - name: fortriggerupdates\n\
     \          value: changeme\n        - name: MYVD_CONFIG_PATH\n          value:\
-    \ WEB-INF/myvd.conf\n        image: docker.io/tremolosecurity/openunison-k8s-activedirectory\n\
-    \        imagePullPolicy: Always\n        livenessProbe:\n          exec:\n  \
-    \          command:\n            - /usr/local/openunison/bin/check_alive.py\n\
-    \          failureThreshold: 10\n          initialDelaySeconds: 120\n        \
-    \  periodSeconds: 10\n          successThreshold: 1\n          timeoutSeconds:\
-    \ 10\n        name: openunison\n        ports:\n        - containerPort: 8080\n\
-    \          name: http\n          protocol: TCP\n        - containerPort: 8443\n\
-    \          name: https\n          protocol: TCP\n        readinessProbe:\n   \
-    \       exec:\n            command:\n            - /usr/local/openunison/bin/check_alive.py\n\
-    \            - https://127.0.0.1:8443/auth/idp/k8sIdp/.well-known/openid-configuration\n\
+    \ WEB-INF/myvd.conf\n        image: docker.io/mlbiam/ouk8ssaml2\n        imagePullPolicy:\
+    \ Always\n        livenessProbe:\n          exec:\n            command:\n    \
+    \        - /usr/local/openunison/bin/check_alive.py\n          failureThreshold:\
+    \ 10\n          initialDelaySeconds: 120\n          periodSeconds: 10\n      \
+    \    successThreshold: 1\n          timeoutSeconds: 10\n        name: openunison\n\
+    \        ports:\n        - containerPort: 8080\n          name: http\n       \
+    \   protocol: TCP\n        - containerPort: 8443\n          name: https\n    \
+    \      protocol: TCP\n        readinessProbe:\n          exec:\n            command:\n\
+    \            - /usr/local/openunison/bin/check_alive.py\n            - https://127.0.0.1:8443/auth/idp/k8sIdp/.well-known/openid-configuration\n\
     \            - issuer\n          failureThreshold: 3\n          initialDelaySeconds:\
     \ 30\n          periodSeconds: 10\n          successThreshold: 1\n          timeoutSeconds:\
     \ 10\n        resources: {}\n        terminationMessagePath: /dev/termination-log\n\

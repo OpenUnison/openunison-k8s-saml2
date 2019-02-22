@@ -250,7 +250,7 @@ for (i=0;i<keys.getLength();i++) {
 }
 
 if (sig_certs.length == 1) {
-    current_cert_choice = com.tremolosecurity.kubernetes.artifacts.util.CertUtils.string2cert(sig_certs[i]);
+    current_cert_choice = com.tremolosecurity.kubernetes.artifacts.util.CertUtils.string2cert(sig_certs[0]);
 } else {
     for (i=0;i<sig_certs.length;i++) {
         current_cert = com.tremolosecurity.kubernetes.artifacts.util.CertUtils.string2cert(sig_certs[i]);
@@ -596,19 +596,19 @@ print("kubectl complete");
 
 
 
-xmlMetaData =  '<EntityDescriptor ID="_10685acd-7df4-427e-b61e-68e4f6407c24" entityID="https://' + inProp['OU_HOST'] + '/auth/SAML2" xmlns="urn:oasis:names:tc:SAML:2.0:metadata">\n';
+xmlMetaData =  '<EntityDescriptor ID="_10685acd-7df4-427e-b61e-68e4f6407c24" entityID="https://' + inProp['OU_HOST'] + '/auth/SAML2Auth" xmlns="urn:oasis:names:tc:SAML:2.0:metadata">\n';
 xmlMetaData += '  <SPSSODescriptor WantAssertionsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">\n';
 xmlMetaData += '      <KeyDescriptor use="signing">\n';
 xmlMetaData += '        <KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">\n';
 xmlMetaData += '              <X509Data>\n';
-xmlMetaData += '                  <X509Certificate>\n' + new org.apache.commons.codec.binary.Base64(64).encodeToString(rp_sig_cert_bytes) + '\n</X509Certificate>\n';
+xmlMetaData += '                  <X509Certificate>\n' + new org.apache.commons.codec.binary.Base64(64).encodeToString(rp_sig_cert_bytes.getEncoded()) + '</X509Certificate>\n';
 xmlMetaData += '              </X509Data>\n';
 xmlMetaData += '          </KeyInfo>\n';
 xmlMetaData += '      </KeyDescriptor>\n';
-xmlMetaData += '      <SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://' + inProp['OU_HOST'] + '/auth/SAML2"/>\n';
+xmlMetaData += '      <SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://' + inProp['OU_HOST'] + '/auth/SAML2Auth"/>\n';
 xmlMetaData += '      <NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified</NameIDFormat>\n';
-xmlMetaData += '      <AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://' + inProp['OU_HOST'] + '/auth/SAML2" index="0" isDefault="true"/>\n';
-xmlMetaData += '      <AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://' + inProp['OU_HOST'] + '/auth/SAML2" index="1"/>\n';
+xmlMetaData += '      <AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://' + inProp['OU_HOST'] + '/auth/SAML2Auth" index="0" isDefault="true"/>\n';
+xmlMetaData += '      <AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://' + inProp['OU_HOST'] + '/auth/SAML2Auth" index="1"/>\n';
 xmlMetaData += '  </SPSSODescriptor>\n';
 xmlMetaData += '</EntityDescriptor>';
 

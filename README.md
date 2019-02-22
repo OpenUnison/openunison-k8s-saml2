@@ -46,7 +46,7 @@ Prior to deploying OpenUnison you will need:
 1. Kubernetes 1.10 or higher
 2. The Nginx Ingress Controler deployed (https://kubernetes.github.io/ingress-nginx/deploy/)
 3. A MySQL or MariaDB Database
-4. The certificate authority certificate for your Active Directory forest
+4. The SAML2 Metadata for your identity provider
 5. An SMTP server for sending notifications
 
 ## Create Environments File
@@ -71,13 +71,6 @@ SMTP_USER=donotreply@domain.com
 SMTP_PASSWORD=xxxx
 SMTP_FROM=donotreply@domain.com
 SMTP_TLS=true
-AD_BASE_DN=cn=users,dc=ent2k12,dc=domain,dc=com
-AD_HOST=192.168.2.75
-AD_PORT=636
-AD_BIND_DN=cn=Administrator,cn=users,dc=ent2k12,dc=domain,dc=com
-AD_BIND_PASSWORD=password
-AD_CON_TYPE=ldaps
-SRV_DNS=false
 OU_CERT_OU=k8s
 OU_CERT_O=Tremolo Security
 OU_CERT_L=Alexandria
@@ -86,7 +79,6 @@ OU_CERT_C=US
 unisonKeystorePassword=start123
 USE_K8S_CM=true
 SESSION_INACTIVITY_TIMEOUT_SECONDS=900
-MYVD_CONFIG_PATH=WEB-INF/myvd.conf
 ```
 
 *Detailed Description or Properties*
@@ -110,13 +102,6 @@ MYVD_CONFIG_PATH=WEB-INF/myvd.conf
 | SMTP_PASSWORD | Password for accessing the SMTP server (may be blank) |
 | SMTP_FROM | The email address that messages from OpenUnison are addressed from |
 | SMTP_TLS | true or false, depending if SMTP should use start tls |
-| AD_BASE_DN | The search base for Active Directory |
-| AD_HOST | The host name for a domain controller or VIP.  If using SRV records to determine hosts, this should be the fully qualified domain name of the domain |
-| AD_PORT | The port to communicate with Active Directory |
-| AD_BIND_DN | The full distinguished name (DN) of a read-only service account for working with Active Directory |
-| AD_BIND_PASSWORD | The password for the `AD_BIND_DN` |
-| AD_CON_TYPE | `ldaps` for secure, `ldap` for plain text |
-| SRV_DNS | If `true`, OpenUnison will lookup domain controllers by the domain's SRV DNS record |
 | OU_CERT_OU | The `OU` attribute for the forward facing certificate |
 | OU_CERT_O | The `O` attribute for the forward facing certificate |
 | OU_CERT_L | The `L` attribute for the forward facing certificate |
@@ -132,14 +117,15 @@ MYVD_CONFIG_PATH=WEB-INF/myvd.conf
 Perform these steps from a location with a working `kubectl` configuration:
 
 1. Create a directory to store `input.props`, ie `/path/to/props` and put `input.props` in that directory
-2. Create a directory for the Active Directory root certificate and store it there with the name `trusted-adldaps.pem`, ie `/path/to/certs`
+2. Copy the metadata from your SAML2 identity provider to `/path/to/props/saml2-metadata.xml`
+3. Create a directory for certs, ie `/path/to/certs`
 
 ## Deployment
 
 Based on where you put the files from `Prepare Deployment`, run the following:
 
 ```
-curl https://raw.githubusercontent.com/TremoloSecurity/kubernetes-artifact-deployment/master/src/main/bash/deploy_openunison.sh | bash -s /path/to/certs /path/to/props https://raw.githubusercontent.com/OpenUnison/openunison-k8s-activedirectory/master/src/main/yaml/artifact-deployment.yaml
+curl https://raw.githubusercontent.com/TremoloSecurity/kubernetes-artifact-deployment/master/src/main/bash/deploy_openunison.sh | bash -s /path/to/certs /path/to/props https://raw.githubusercontent.com/OpenUnison/openunison-k8s-saml2/master/src/main/yaml/artifact-deployment.yaml
 ```
 
 The output will look like:
@@ -159,6 +145,25 @@ artifact-deployment-jzmnr   0/1       Completed   0         15s
 ```
 
 Once you see `Completed`, you can exit the script (`Ctl+C`).  This script creates all of the appropriate objects in Kubernetes, signs certificates and deploys both OpenUnison and the Dashboard.  
+
+## Complete Integrate with your Identity Provider
+
+Run `kubectl describe configmap api-server-config -n openunison` to get the metadata for your identity provider.  Import it into your identity provider and add the following attributes to the assertion so OpenUnison knows how the logged in uers is:
+
+| Attribute Name | Active Directory Attribute | Description |
+| -------------- | -------------------------- | ----------- |
+| uid            | samAccountName             | User's login id |
+| givenName      | givenName                  | User's first name |
+| sn             | sn                         | User's last name |
+| mail           | mail                       | User's email address |
+
+If using Active Directory Federation Services, you can use the following claims transformation rule:
+```
+c:[Type == "http://schemas.microsoft.com/ws/2008/06/identity/claims/windowsaccountname", Issuer == "AD AUTHORITY"]
+ => issue(store = "Active Directory", types = ("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier", "uid", "givenName", "sn", "mail"), query = ";sAMAccountName,sAMAccountName,givenName,sn,mail;{0}", param = c.Value);
+```
+
+Once the metadata is imported and the attributes are added, you are ready to login to OpenUnison.
 
 ## Complete SSO Integration with Kubernetes
 
@@ -223,89 +228,3 @@ Redpeloy OpenUnison to pick up the changes.  The easiest way is to update an env
 Users can now login to create namespaces, request access to cluster admin or request access to other clusters.
 
 Now you can begin mapping OpenUnison's capabilities to your business and compliance needs.  For instance you can add multi-factor authentication with TOTP or U2F, Create privileged workflows for onboarding, scheduled workflows that will deprovision users, etc.
-
-# Customizing Directory Connections
-
-If you're running multiple directories, or need to connect to a generic LDAP directory isntead of Active Directory you can provide a custom MyVirtualDirectory configuration file without a re-build of your containers.  Start with the myvd.conf file at https://github.com/OpenUnison/openunison-k8s-login-activedirectory/blob/master/src/main/webapp/WEB-INF/myvd.conf.  ONLY edit the section that begins with `server.activedirectory`.  As an example, the below configuration works against a generic LDAPv3 directory with the `VirtualMemberOf` insert configured to create a `memeberOf` attribute on users so we can supply groups to Kubernetes:
-
-```
-#Global AuthMechConfig
-server.globalChain=accesslog
-
-server.globalChain.accesslog.className=com.tremolosecurity.proxy.myvd.log.AccessLog
-
-server.nameSpaces=rootdse,myvdroot,shadowUsers,activedirectory
-server.rootdse.chain=dse
-server.rootdse.nameSpace=
-server.rootdse.weight=0
-server.rootdse.dse.className=net.sourceforge.myvd.inserts.RootDSE
-server.rootdse.dse.config.namingContexts=o=Tremolo
-server.myvdroot.chain=root
-server.myvdroot.nameSpace=o=Tremolo
-server.myvdroot.weight=0
-server.myvdroot.root.className=net.sourceforge.myvd.inserts.RootObject
-
-server.shadowUsers.chain=debug,mapping,api
-server.shadowUsers.nameSpace=ou=shadow,o=Tremolo
-server.shadowUsers.weight=0
-server.shadowUsers.enabled=true
-server.shadowUsers.debug.className=net.sourceforge.myvd.inserts.DumpTransaction
-server.shadowUsers.debug.config.logLevel=info
-server.shadowUsers.debug.config.label=k8s
-server.shadowUsers.mapping.className=net.sourceforge.myvd.inserts.mapping.AttributeMapper
-server.shadowUsers.mapping.config.mapping=mail=email,givenName=first_name,sn=last_name
-server.shadowUsers.api.className=com.tremolosecurity.myvd.K8sCrdInsert
-server.shadowUsers.api.config.nameSpace=openunison
-server.shadowUsers.api.config.k8sTargetName=k8s
-
-server.activedirectory.chain=objectguid2text,dnmapper,memberof,objmap,membertrans,ldap
-server.activedirectory.nameSpace=ou=activedirectory,o=Data
-server.activedirectory.weight=0
-server.activedirectory.enabled=true
-server.activedirectory.objectguid2text.className=com.tremolosecurity.proxy.myvd.inserts.util.UUIDtoText
-server.activedirectory.objectguid2text.config.attributeName=objectGUID
-server.activedirectory.dnmapper.className=net.sourceforge.myvd.inserts.mapping.DNAttributeMapper
-server.activedirectory.dnmapper.config.dnAttribs=member,owner,member,distinguishedName,manager
-server.activedirectory.dnmapper.config.localBase=ou=activedirectory,o=Data
-server.activedirectory.dnmapper.config.urlAttribs=
-server.activedirectory.dnmapper.config.remoteBase=#[AD_BASE_DN]
-server.activedirectory.memberof.className=net.sourceforge.myvd.inserts.mapping.VirtualMemberOf
-server.activedirectory.memberof.config.searchBase=ou=activedirectory,o=Data
-server.activedirectory.memberof.config.applyToObjectClass=inetOrgPerson
-server.activedirectory.memberof.config.attributeName=memberOf
-server.activedirectory.memberof.config.searchObjectClass=groupOfNames
-server.activedirectory.memberof.config.searchAttribute=member
-server.activedirectory.memberof.config.replace=false
-server.activedirectory.objmap.className=net.sourceforge.myvd.inserts.mapping.AttributeValueMapper
-server.activedirectory.objmap.config.mapping=objectClass.inetOrgPerson=inetOrgPerson,objectClass.groupofnames=groupOfNames
-server.activedirectory.membertrans.className=net.sourceforge.myvd.inserts.mapping.AttributeMapper
-server.activedirectory.membertrans.config.mapping=member=member,uid=uid
-server.activedirectory.ldap.className=com.tremolosecurity.proxy.myvd.inserts.ad.ADLdapInsert
-server.activedirectory.ldap.config.host=#[AD_HOST]
-server.activedirectory.ldap.config.port=#[AD_PORT]
-server.activedirectory.ldap.config.remoteBase=#[AD_BASE_DN]
-server.activedirectory.ldap.config.proxyDN=#[AD_BIND_DN]
-server.activedirectory.ldap.config.proxyPass=#[AD_BIND_PASSWORD]
-server.activedirectory.ldap.config.useSrvDNS=#[SRV_DNS]
-server.activedirectory.ldap.config.ignoreRefs=true
-server.activedirectory.ldap.config.passBindOnly=true
-server.activedirectory.ldap.config.maxIdle=90000
-server.activedirectory.ldap.config.maxMillis=90000
-server.activedirectory.ldap.config.maxStaleTimeMillis=90000
-server.activedirectory.ldap.config.minimumConnections=10
-server.activedirectory.ldap.config.maximumConnections=10
-server.activedirectory.ldap.config.usePaging=false
-server.activedirectory.ldap.config.pageSize=0
-server.activedirectory.ldap.config.heartbeatIntervalMillis=60000
-server.activedirectory.ldap.config.type=#[AD_CON_TYPE]
-server.activedirectory.ldap.config.sslSocketFactory=com.tremolosecurity.proxy.ssl.TremoloSSLSocketFactory
-```
-
-Once OpenUnison is deployed, create a directory with your `myvd.conf` file in it and deploy it as a `ConfigMap`:
-
-```
-kubectl create configmap myvd --from-file . -n openunison
-```
-
-Next edit the `openunison` deployment to mount the `ConfigMap` to `/etc/myvd` and change the environment variable `MYVD_CONFIG_PATH` to `/etc/myvd/myvd.conf`.  Once the OpenUnison pods have been recreated, you can login with your LDAP uid (as opposed to an Active Directory samAccountName).
-

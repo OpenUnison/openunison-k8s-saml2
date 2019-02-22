@@ -228,7 +228,7 @@ spec:
           value: changeme
         - name: MYVD_CONFIG_PATH
           value: WEB-INF/myvd.conf
-        image: docker.io/tremolosecurity/openunison-k8s-activedirectory
+        image: docker.io/mlbiam/ouk8ssaml2
         imagePullPolicy: Always
         livenessProbe:
           exec:
