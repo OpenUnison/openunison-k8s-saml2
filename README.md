@@ -50,6 +50,7 @@ Prior to deploying OpenUnison you will need:
 3. A MySQL or MariaDB Database
 4. The SAML2 Metadata for your identity provider
 5. An SMTP server for sending notifications
+6. Deploy the dashboard to your cluster
 
 ## Create Environments File
 
