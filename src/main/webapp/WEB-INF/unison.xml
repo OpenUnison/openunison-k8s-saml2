@@ -3,7 +3,7 @@
   <applications openSessionCookieName="openSession" openSessionTimeout="9000">
     @[dir:applications]
   </applications>
-  <myvdConfig>#[MYVD_CONFIG_PATH]</myvdConfig>
+  <myvdConfig>WEB-INF/myvd.conf</myvdConfig>
   <authMechs>
     @[dir:auth_mechs]
   </authMechs>
