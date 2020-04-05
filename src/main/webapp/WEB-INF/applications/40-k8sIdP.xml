@@ -26,7 +26,7 @@
                     <params name="dialect" value="#[OU_HIBERNATE_DIALECT]"/>
                     <params name="validationQuery" value="#[OU_JDBC_VALIDATION]"/>
                     <mappings strict="true">
-                        <mapping targetAttributeName="sub" targetAttributeSource="sub" sourceType="user"/>
+                        <mapping targetAttributeName="sub" targetAttributeSource="uid" sourceType="user"/>
                         <mapping targetAttributeName="name" targetAttributeSource="${givenname} ${sn}" sourceType="composite"/>
                         <mapping targetAttributeName="preferred_username" targetAttributeSource="uid" sourceType="user"/>
                         <mapping targetAttributeName="email" targetAttributeSource="mail" sourceType="user"/>
